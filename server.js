@@ -74,6 +74,8 @@ io.on('connection', (socket) => {
         let availableUsers = Object.keys(users).filter(id => id !== socket.id && !users[id].busy);
         if (availableUsers.length > 0) {
             let target = availableUsers[Math.floor(Math.random() * availableUsers.length)];
+            users[socket.id].busy = true;
+            users[target].busy = true;
             socket.emit('new-peer', target);
         } else {
             socket.emit('no-users-available');
