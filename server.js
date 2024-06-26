@@ -81,6 +81,15 @@ io.on('connection', (socket) => {
             socket.emit('no-users-available');
         }
     });
+
+    socket.on('check-availability', () => {
+        let availableUsers = Object.keys(users).filter(id => id !== socket.id && !users[id].busy);
+        if (availableUsers.length > 0) {
+            socket.emit('available-users', availableUsers);
+        } else {
+            socket.emit('no-users-available');
+        }
+    });
 });
 
 server.listen(port, () => console.log('Server is running on port ' + port));
