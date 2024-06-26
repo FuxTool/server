@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Random Video Call</title>
+    <style>
+        video {
+            width: 300px;
+            height: 300px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <video id="localVideo" autoplay muted></video>
+    <video id="remoteVideo" autoplay></video>
+    <button id="skipButton" disabled>Skip</button>
+    <p id="status"></p>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const skipButton = document.getElementById('skipButton');
+        const status = document.getElementById('status');
+
+        let localStream;
+        let peerConnection;
+        const configuration = {
+            'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]
+        };
+
+        async function getMedia() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localVideo.srcObject = stream;
+                localStream = stream;
+                skipButton.disabled = false;
+            } catch (err) {
+                console.error('Error accessing media devices.', err);
+            }
+        }
+
+        function createPeerConnection(target) {
+            peerConnection = new RTCPeerConnection(configuration);
+
+            peerConnection.onicecandidate = ({ candidate }) => {
+                if (candidate) {
+                    socket.emit('candidate', { candidate, target });
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                remoteVideo.srcObject = event.streams[0];
+            };
+
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+        }
+
+        function handleOffer(sdp, source) {
+            createPeerConnection(source);
+            peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+            peerConnection.createAnswer()
+                .then(answer => {
+                    peerConnection.setLocalDescription(answer);
+                    socket.emit('answer', { sdp: answer, target: source });
+                });
+        }
+
+        function handleAnswer(sdp) {
+            peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+        }
+
+        function handleCandidate(candidate) {
+            peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+
+        function handleNewPeer(target) {
+            if (peerConnection) {
+                peerConnection.close();
+            }
+            createPeerConnection(target);
+            peerConnection.createOffer()
+                .then(offer => {
+                    peerConnection.setLocalDescription(offer);
+                    socket.emit('offer', { sdp: offer, target });
+                });
+        }
+
+        socket.on('offer', ({ sdp, source }) => handleOffer(sdp, source));
+        socket.on('answer', ({ sdp }) => handleAnswer(sdp));
+        socket.on('candidate', ({ candidate }) => handleCandidate(candidate));
+        socket.on('new-peer', target => handleNewPeer(target));
+        socket.on('no-users-available', () => {
+            status.textContent = 'No users available.';
+        });
+
+        skipButton.addEventListener('click', () => {
+            status.textContent = '';
+            socket.emit('skip');
+        });
+
+        getMedia();
+    </script>
+</body>
+</html>
