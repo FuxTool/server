@@ -100,7 +100,17 @@
 
         skipButton.addEventListener('click', () => {
             status.textContent = '';
-            socket.emit('skip');
+            socket.emit('check-availability');
+        });
+
+        socket.on('available-users', (availableUsers) => {
+            let target = availableUsers[Math.floor(Math.random() * availableUsers.length)];
+            socket.emit('skip', target);
+        });
+
+        socket.on('peer-disconnected', () => {
+            // Handle peer disconnect event
+            console.log('Peer disconnected.');
         });
 
         getMedia();
