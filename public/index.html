@@ -38,6 +38,7 @@
                 skipButton.disabled = false;
             } catch (err) {
                 console.error('Error accessing media devices.', err);
+                status.textContent = 'Error accessing media devices. Please check your permissions and try again.';
             }
         }
 
